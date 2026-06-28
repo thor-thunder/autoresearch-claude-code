@@ -1,6 +1,6 @@
 ---
 name: git-repo
-description: Scaffold an autoresearch experiment for any codebase by detecting its tech stack and generating a Python benchmark artifact. Use when asked to "research this", "run experiments", "start researching", "set up experiments", "benchmark this project", "optimize this codebase", "analyze this project", or any general research or experiment request against a local codebase.
+description: Scaffold an autoresearch experiment for any codebase by detecting its tech stack and generating a Python benchmark artifact. Use when (1) the user's message contains the word "research", or (2) any experiment/benchmark/optimization request is made against a local codebase.
 ---
 
 # Git Repo Skill
