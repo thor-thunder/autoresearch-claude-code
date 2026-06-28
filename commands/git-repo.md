@@ -1,5 +1,5 @@
 ---
-description: Analyze a git repository and generate autoresearch setup files (autoresearch_bench.py, autoresearch.sh, autoresearch.md)
+description: Start research experiments on any codebase — detects tech stack, generates a Python benchmark artifact, and wires up the autoresearch loop
 argument-hint: [path/to/repo | .]
 allowed-tools:
   - Read

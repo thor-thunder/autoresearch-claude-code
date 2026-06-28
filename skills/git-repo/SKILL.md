@@ -1,6 +1,6 @@
 ---
 name: git-repo
-description: Analyze a git repository's tech stack and scaffold an autoresearch experiment with a Python benchmark artifact. Use when asked to "set up autoresearch for this repo", "analyze this git repo", or "scaffold experiments for this project".
+description: Scaffold an autoresearch experiment for any codebase by detecting its tech stack and generating a Python benchmark artifact. Use when asked to "research this", "run experiments", "start researching", "set up experiments", "benchmark this project", "optimize this codebase", "analyze this project", or any general research or experiment request against a local codebase.
 ---
 
 # Git Repo Skill
