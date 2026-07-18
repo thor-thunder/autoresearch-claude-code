@@ -1,6 +1,6 @@
 ---
 name: autoresearch
-description: Set up and run an autonomous experiment loop for any optimization target. Use when asked to "run autoresearch", "optimize X in a loop", "set up autoresearch for X", or "start experiments".
+description: Set up and run an autonomous experiment loop that iteratively optimizes any measurable metric — runtime, accuracy, loss, memory, binary size, cost. Use whenever the user asks to "run autoresearch", "optimize X in a loop", "keep improving X", "start experiments", "tune this until it's faster/better", or wants unattended, benchmark-driven iteration that tries ideas, keeps winners, and discards losers — even if they don't say "autoresearch" explicitly.
 ---
 
 # Autoresearch
@@ -12,8 +12,12 @@ Autonomous experiment loop: try ideas, keep what works, discard what doesn't, ne
 1. Ask (or infer): **Goal**, **Command**, **Metric** (+ direction), **Files in scope**, **Constraints**.
 2. `git checkout -b autoresearch/<goal>-<date>`
 3. Read the source files. Understand the workload deeply before writing anything.
-4. `mkdir -p experiments` then write `autoresearch.md`, `autoresearch.sh`, and `experiments/worklog.md` (see below). Commit all three.
-5. Initialize experiment (write config header to `autoresearch.jsonl`) → run baseline → log result → start looping immediately.
+4. Protect the experiment state from git. The loop uses `git checkout -- .` and `git clean -fd` to revert failed experiments — if the state files are visible to git, a discard would revert the experiment log or delete it outright, and a keep would pollute the user's history with bookkeeping. Exclude them locally (don't edit the user's `.gitignore` — `.git/info/exclude` has the same effect without touching their repo):
+   ```bash
+   printf '%s\n' autoresearch.jsonl autoresearch-dashboard.md autoresearch.ideas.md .autoresearch-off experiments/worklog.md >> .git/info/exclude
+   ```
+5. `mkdir -p experiments` then write `autoresearch.md`, `autoresearch.sh`, and `experiments/worklog.md` (see below). Commit `autoresearch.md` and `autoresearch.sh` (the worklog stays out of git — it's updated on discarded runs too, and committing it would put those updates at risk from the next revert).
+6. Initialize experiment (write config header to `autoresearch.jsonl`) → run baseline → log result → start looping immediately.
 
 ### `autoresearch.md`
 
@@ -51,6 +55,8 @@ Update `autoresearch.md` periodically — especially the "What's Been Tried" sec
 ### `autoresearch.sh`
 
 Bash script (`set -euo pipefail`) that: pre-checks fast (syntax errors in <1s), runs the benchmark, outputs `METRIC name=number` lines. Keep it fast — every second is multiplied by hundreds of runs. Update it during the loop as needed.
+
+If the primary metric is wall time, measure it *inside* the script with sub-second precision (e.g., Python's `time.perf_counter()` around the workload) and emit it as a `METRIC` line — that's more portable and more precise than timing the script from outside.
 
 ---
 
@@ -107,19 +113,19 @@ echo '{"type":"config","name":"<name>","metricName":"<metric>","metricUnit":"<un
 
 ## Running Experiments (equivalent of `run_experiment`)
 
-Run the benchmark command, capturing timing and output:
+Run the benchmark, capturing output and the real exit code (don't pipe the command into `tee` — the pipe would report `tee`'s exit code, not the benchmark's, and crashes would be logged as successes):
 
 ```bash
-START_TIME=$(date +%s%N)
-bash -c "./autoresearch.sh" 2>&1 | tee /tmp/autoresearch-output.txt
+START=$(date +%s)
+./autoresearch.sh > /tmp/autoresearch-output.txt 2>&1
 EXIT_CODE=$?
-END_TIME=$(date +%s%N)
-DURATION=$(echo "scale=3; ($END_TIME - $START_TIME) / 1000000000" | bc)
-echo "Duration: ${DURATION}s, Exit code: ${EXIT_CODE}"
+END=$(date +%s)
+cat /tmp/autoresearch-output.txt
+echo "Duration: $((END - START))s, Exit code: ${EXIT_CODE}"
 ```
 
 After running:
-- Parse `METRIC name=number` lines from the output to extract metric values
+- Parse metric values from the output: `grep -E '^METRIC [A-Za-z_]+=' /tmp/autoresearch-output.txt`
 - If exit code != 0 → this is a crash
 - Read the output to understand what happened
 
@@ -131,9 +137,9 @@ After each experiment run, follow this exact protocol:
 
 ### 1. Determine status
 
-- **keep**: primary metric improved (lower if `bestDirection=lower`, higher if `bestDirection=higher`)
+- **keep**: primary metric improved (lower if `bestDirection=lower`, higher if `bestDirection=higher`) AND the result is still correct (tests pass, output unchanged where required — a fast wrong answer is a crash, not a keep)
 - **discard**: primary metric worse or equal to best kept result
-- **crash**: command failed (non-zero exit code)
+- **crash**: command failed (non-zero exit code) or produced incorrect output
 
 Secondary metrics are for monitoring only — they almost never affect keep/discard decisions. Only discard a primary improvement if a secondary metric degraded catastrophically, and explain why in the description.
 
@@ -157,6 +163,8 @@ git rev-parse --short=7 HEAD
 git checkout -- .
 git clean -fd
 ```
+
+(The state files survive this because Setup step 4 excluded them from git. If you ever find them tracked or unignored, fix the exclusion before reverting — reverting over them destroys the experiment log.)
 
 Use the current HEAD hash (before revert) as the commit field.
 
@@ -223,11 +231,12 @@ Include delta percentages vs baseline for each metric value. Show ALL runs in th
 **LOOP FOREVER.** Never ask "should I continue?" — the user expects autonomous work.
 
 - **Primary metric is king.** Improved → `keep`. Worse/equal → `discard`. Secondary metrics rarely affect this.
+- **Correctness is the gate.** A speedup that changes required output or breaks tests isn't a win — verify before keeping.
 - **Simpler is better.** Removing code for equal perf = keep. Ugly complexity for tiny gain = probably discard.
 - **Don't thrash.** Repeatedly reverting the same idea? Try something structurally different.
 - **Crashes:** fix if trivial, otherwise log and move on. Don't over-invest.
 - **Think longer when stuck.** Re-read source files, study the profiling data, reason about what the CPU is actually doing. The best ideas come from deep understanding, not from trying random variations.
-- **Resuming:** if `autoresearch.md` exists, read it + `autoresearch.jsonl` + `experiments/worklog.md` + git log, continue looping. The worklog has the full narrative and insights.
+- **Resuming:** if `autoresearch.md` exists, read it + `autoresearch.jsonl` + `experiments/worklog.md` + git log, continue looping. The worklog has the full narrative and insights. Continue run numbering and the current segment — don't re-initialize unless the optimization target changed.
 
 **NEVER STOP.** The user may be away for hours. Keep going until interrupted.
 
