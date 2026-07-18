@@ -1,0 +1,40 @@
+{
+  "skill_name": "autoresearch",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Set up an autonomous experiment loop to make `python3 process.py` faster in the project directory. Goal: minimize wall-clock runtime. Metric: seconds, lower is better. Files in scope: process.py. Constraint: the program must still print exactly `PRIMES 4203`. Bounded test: baseline plus at most 4 experiments, then stop.",
+      "expected_output": "Full autoresearch session scaffolding (autoresearch.md, autoresearch.sh, autoresearch.jsonl, dashboard, worklog) on an autoresearch/* branch; baseline + experiments logged per the JSONL protocol; kept experiments committed with Result: trailers; state files untracked; runtime improved with checksum intact.",
+      "files": [],
+      "expectations": [
+        "autoresearch.jsonl exists and every line parses as JSON",
+        "first JSONL line is a config header with type=config and bestDirection=lower",
+        "at least 3 result lines (baseline + >=2 experiments), each with run, commit, metric, status, description, timestamp, segment fields",
+        "run numbers are sequential starting at 1",
+        "autoresearch.md exists with Objective, Metrics, How to Run, Files in Scope, and Constraints sections",
+        "autoresearch.sh exists, is executable, and emits a METRIC line when run",
+        "autoresearch-dashboard.md exists and mentions every run number in the JSONL",
+        "experiments/worklog.md exists with an entry for every experiment run",
+        "best kept metric improved vs baseline and process.py still prints PRIMES 4203",
+        "work happened on an autoresearch/* branch with at least one commit carrying a 'Result:' trailer",
+        "autoresearch state files (autoresearch.jsonl, autoresearch-dashboard.md) are not tracked by git"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "An autoresearch experiment loop is already in progress in the project directory (state files and git history present). Resume the loop and continue optimizing per the existing configuration. Bounded test: at most 3 more experiments, then stop.",
+      "expected_output": "Loop resumed without re-initialization: single config header preserved, run numbering continues from 3, new experiments logged, dashboard regenerated with all runs, worklog appended, keeps committed with Result: trailers, checksum intact.",
+      "files": [],
+      "expectations": [
+        "autoresearch.jsonl contains exactly one config header (no re-initialization) and it is the first line",
+        "seeded runs 1-2 are preserved and new result lines continue numbering from run 3 in segment 0",
+        "every JSONL line parses as JSON with required result fields",
+        "at least one new experiment was run and the best kept metric improved vs the 2.324s baseline",
+        "process.py still prints exactly PRIMES 4203",
+        "experiments/worklog.md contains entries for the new runs (Run 3+), appended after the seeded entries",
+        "autoresearch-dashboard.md was regenerated to include both seeded and new runs",
+        "kept experiments have git commits with a 'Result:' trailer and state files remain untracked by git"
+      ]
+    }
+  ]
+}
